@@ -157,45 +157,55 @@ class Quote:
             interval
         )
 
-        # Parse start time - support both date and datetime formats
-        try:
-            # Try datetime format first
-            start_time = datetime.strptime(
-                ticker.start,
-                "%Y-%m-%d %H:%M:%S"
-            )
-        except ValueError:
+        # Parse start time - support multiple date formats
+        start_time = None
+        date_formats = [
+            "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+            "%d-%m-%Y %H:%M:%S",  # DD-MM-YYYY HH:MM:SS
+            "%Y-%m-%d",            # YYYY-MM-DD
+            "%d-%m-%Y",            # DD-MM-YYYY (preferred format)
+        ]
+        
+        for fmt in date_formats:
             try:
-                # Try date only format
-                start_time = datetime.strptime(ticker.start, "%Y-%m-%d")
+                start_time = datetime.strptime(ticker.start, fmt)
+                break
             except ValueError:
-                raise ValueError(
-                    f"Định dạng ngày không hợp lệ: {ticker.start}. "
-                    f"Sử dụng định dạng YYYY-MM-DD hoặc "
-                    f"YYYY-MM-DD HH:MM:SS"
-                )
+                continue
+        
+        if start_time is None:
+            raise ValueError(
+                f"Định dạng ngày không hợp lệ: {ticker.start}. "
+                f"Sử dụng định dạng DD-MM-YYYY, YYYY-MM-DD, "
+                f"DD-MM-YYYY HH:MM:SS hoặc YYYY-MM-DD HH:MM:SS"
+            )
 
         # Calculate end timestamp
         if end is not None:
-            try:
-                # Try datetime format first
-                end_time = datetime.strptime(
-                    ticker.end,
-                    "%Y-%m-%d %H:%M:%S"
-                )
-            except ValueError:
+            end_time = None
+            date_formats = [
+                "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                "%d-%m-%Y %H:%M:%S",  # DD-MM-YYYY HH:MM:SS
+                "%Y-%m-%d",            # YYYY-MM-DD
+                "%d-%m-%Y",            # DD-MM-YYYY (preferred format)
+            ]
+            
+            for fmt in date_formats:
                 try:
-                    # Try date only format
-                    end_time = datetime.strptime(
-                        ticker.end,
-                        "%Y-%m-%d"
-                    ) + pd.Timedelta(days=1)
+                    end_time = datetime.strptime(ticker.end, fmt)
+                    # Add 1 day for date-only formats to include the end date
+                    if fmt in ["%Y-%m-%d", "%d-%m-%Y"]:
+                        end_time = end_time + pd.Timedelta(days=1)
+                    break
                 except ValueError:
-                    raise ValueError(
-                        f"Định dạng ngày không hợp lệ: {ticker.end}. "
-                        f"Sử dụng định dạng YYYY-MM-DD hoặc "
-                        f"YYYY-MM-DD HH:MM:SS"
-                    )
+                    continue
+            
+            if end_time is None:
+                raise ValueError(
+                    f"Định dạng ngày không hợp lệ: {ticker.end}. "
+                    f"Sử dụng định dạng DD-MM-YYYY, YYYY-MM-DD, "
+                    f"DD-MM-YYYY HH:MM:SS hoặc YYYY-MM-DD HH:MM:SS"
+                )
 
             if start_time > end_time:
                 raise ValueError(
@@ -305,6 +315,33 @@ class Quote:
             resample_map=_RESAMPLE_MAP
         )
 
+        # Filter data to the exact requested date range
+        # The API may return more data than requested due to count_back
+        if not df.empty and 'time' in df.columns:
+            # Convert time column to datetime if it's not already
+            if not pd.api.types.is_datetime64_any_dtype(df['time']):
+                df['time'] = pd.to_datetime(df['time'], errors='coerce')
+            
+            # Calculate the actual end date (remove the +1 day that was added for the API call)
+            if end is not None:
+                actual_end_time = end_time - pd.Timedelta(days=1)
+            else:
+                actual_end_time = datetime.now()
+            
+            # Filter to start_date (inclusive) and end_date (inclusive)
+            # Use date comparison for daily intervals, datetime for others
+            if interval_key == "1D":
+                # For daily data, compare dates only (ignore time component)
+                start_date = start_time.date()
+                end_date = actual_end_time.date()
+                df_time_dates = pd.to_datetime(df['time']).dt.date
+                mask = (df_time_dates >= start_date) & (df_time_dates <= end_date)
+            else:
+                # For intraday data, use full datetime comparison
+                mask = (df['time'] >= start_time) & (df['time'] <= actual_end_time)
+            
+            df = df[mask].copy()
+        
         return df
 
     @optimize_execution("VCI")

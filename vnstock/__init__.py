@@ -8,6 +8,7 @@ from .api.financial import Finance
 from .api.listing import Listing
 from .api.trading import Trading
 from .api.screener import Screener
+from .api.download import Download
 from .explorer.fmarket import Fund
 
 # Market constants
@@ -35,6 +36,7 @@ __all__ = [
     "Finance",
     "Trading",
     "Screener",
+    "Download",
     "Fund",
     "connector",
     "INDICES_INFO",

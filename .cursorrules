@@ -1,0 +1,241 @@
+# Cursor Rules for Vnstock - Vietnamese Stock Market Analysis Library
+
+## Project Overview
+Vnstock is a comprehensive Python library for Vietnamese stock market analysis and automation. It provides easy access to stock data, financial analysis tools, and trading automation capabilities for the Vietnamese market including stocks, indices, derivatives, bonds, forex, and crypto data.
+
+**Architecture Note**: This codebase follows Python packaging best practices with modular design, comprehensive error handling, type safety, and extensive data validation for financial applications.
+
+## Tech Stack
+- **Language**: Python 3.10+ with type hints
+- **Core Libraries**: pandas, requests, beautifulsoup4, seaborn
+- **Data Validation**: pydantic for data models and validation
+- **Visualization**: vnstock_ezchart for charting, seaborn for statistical plots
+- **AI Integration**: vnai for AI-powered analysis
+- **Testing**: pytest with coverage
+- **Build System**: setuptools with pyproject.toml
+- **Error Handling**: tenacity for retry logic
+
+## Code Style Guidelines
+
+### File Structure
+- Main package in `/vnstock` directory
+- API interfaces in `/vnstock/api`
+- Data connectors in `/vnstock/connector`
+- Core functionality in `/vnstock/core`
+- Common utilities in `/vnstock/common`
+- Bot and automation in `/vnstock/bot`
+- Exploration tools in `/vnstock/explorer`
+- Configuration in `/vnstock/config.py`
+- Constants in `/vnstock/constants.py`
+
+### Python Code Style
+- Follow PEP 8 style guidelines
+- Use type hints for all function signatures and variables
+- Use docstrings for all public functions and classes
+- Prefer explicit imports over wildcard imports
+- Use f-strings for string formatting
+- Apply meaningful variable names in English
+- Use snake_case for functions and variables
+- Use PascalCase for classes
+
+### Data Handling
+- Use pandas DataFrames for structured data
+- Apply pydantic models for data validation
+- Handle missing data appropriately (NaN, None)
+- Use proper data types for financial data (Decimal for precision when needed)
+- Validate input parameters before API calls
+- Implement proper error handling for network requests
+
+### API Design
+- Use consistent function naming patterns
+- Return standardized data structures
+- Implement proper error messages in Vietnamese and English
+- Use retry logic with tenacity for network calls
+- Apply rate limiting for external API calls
+- Handle authentication and API keys securely
+
+### Error Handling
+- Use custom exception classes for different error types
+- Implement proper logging for debugging
+- Use try-catch blocks with specific exception types
+- Provide meaningful error messages to users
+- Handle network timeouts and connection errors
+- Validate data before processing
+
+## Development Guidelines
+
+### Dependencies
+- All dependencies specified in `pyproject.toml`
+- Use pandas for data manipulation
+- Use requests for HTTP calls
+- Use beautifulsoup4 for HTML parsing
+- Use pydantic for data validation
+- Use tenacity for retry logic
+
+### Testing
+- Write unit tests for all public functions
+- Use pytest fixtures for test setup
+- Test error conditions and edge cases
+- Maintain test coverage above 80%
+- Use parameterized tests for multiple scenarios
+
+### Documentation
+- Write comprehensive docstrings
+- Include examples in docstrings
+- Document API endpoints and data sources
+- Provide usage examples in README
+- Maintain changelog for version updates
+
+## Common Patterns
+
+### Function Structure
+```python
+from typing import Optional, Union, Dict, Any
+import pandas as pd
+from pydantic import BaseModel
+
+def fetch_stock_data(symbol: str, 
+                     start_date: Optional[str] = None,
+                     end_date: Optional[str] = None) -> pd.DataFrame:
+    """
+    Fetch stock data for a given symbol.
+    
+    Args:
+        symbol: Stock symbol (e.g., 'VCB', 'FPT')
+        start_date: Start date in 'YYYY-MM-DD' format
+        end_date: End date in 'YYYY-MM-DD' format
+        
+    Returns:
+        DataFrame with stock data
+        
+    Raises:
+        ValueError: If symbol is invalid
+        NetworkError: If API call fails
+    """
+    try:
+        # Validate inputs
+        if not symbol or len(symbol) < 3:
+            raise ValueError("Invalid stock symbol")
+            
+        # Fetch data
+        data = _fetch_from_api(symbol, start_date, end_date)
+        
+        # Process and return
+        return _process_data(data)
+        
+    except Exception as e:
+        logger.error(f"Error fetching data for {symbol}: {e}")
+        raise
+```
+
+### Data Validation Pattern
+```python
+from pydantic import BaseModel, validator
+from typing import Optional
+from datetime import datetime
+
+class StockData(BaseModel):
+    symbol: str
+    price: float
+    volume: int
+    timestamp: datetime
+    
+    @validator('symbol')
+    def validate_symbol(cls, v):
+        if not v or len(v) < 3:
+            raise ValueError('Symbol must be at least 3 characters')
+        return v.upper()
+    
+    @validator('price')
+    def validate_price(cls, v):
+        if v <= 0:
+            raise ValueError('Price must be positive')
+        return v
+```
+
+### Error Handling Pattern
+```python
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
+from vnstock.common.exceptions import NetworkError, DataError
+
+logger = logging.getLogger(__name__)
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+def fetch_with_retry(url: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.Timeout:
+        raise NetworkError("Request timeout")
+    except requests.exceptions.ConnectionError:
+        raise NetworkError("Connection failed")
+    except requests.exceptions.HTTPError as e:
+        raise DataError(f"HTTP error: {e}")
+```
+
+## Key Files to Understand
+- `/vnstock/__init__.py` - Main package initialization and exports
+- `/vnstock/config.py` - Configuration settings and API endpoints
+- `/vnstock/constants.py` - Market constants, symbols, and mappings
+- `/vnstock/base.py` - Base classes and common functionality
+- `/vnstock/api/` - Public API interfaces
+- `/vnstock/connector/` - Data source connectors
+- `/vnstock/core/` - Core business logic
+- `/vnstock/common/` - Shared utilities and exceptions
+- `/vnstock/explorer/` - Data exploration and analysis tools
+- `pyproject.toml` - Project configuration and dependencies
+
+## Vietnamese Market Specifics
+
+### Stock Symbols
+- Use uppercase format (e.g., 'VCB', 'FPT', 'HPG')
+- Handle different exchanges: HOSE, HNX, UPCOM
+- Support derivative symbols (e.g., 'VN30F24M')
+- Handle warrant symbols (CW prefix)
+
+### Data Sources
+- Primary data from Vietnamese exchanges
+- Real-time price feeds
+- Historical data with proper timezone handling
+- Financial statements and company data
+- Market indices and sector data
+
+### Cultural Considerations
+- Provide error messages in Vietnamese when appropriate
+- Handle Vietnamese holiday calendars
+- Consider local market trading hours
+- Support Vietnamese number formatting
+
+## Git Workflow
+- Use conventional commits with Vietnamese descriptions when appropriate
+- Write clear commit messages describing changes
+- Test data fetching before committing
+- Update documentation for API changes
+- Run tests before merging
+- Tag releases properly
+
+## Testing Guidelines
+- Mock external API calls in tests
+- Test with real market data when possible
+- Validate data accuracy and completeness
+- Test error conditions thoroughly
+- Use parameterized tests for multiple symbols
+- Test timezone handling for market data
+
+## Performance Considerations
+- Cache API responses when appropriate
+- Use efficient data structures for large datasets
+- Implement lazy loading for large datasets
+- Optimize pandas operations
+- Handle memory usage for large historical data
+- Use async operations where beneficial
+
+## Security Notes
+- Never commit API keys or credentials
+- Use environment variables for sensitive data
+- Validate all user inputs
+- Handle authentication tokens securely
+- Use HTTPS for all network requests
+- Implement proper error handling without exposing sensitive information
